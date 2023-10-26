@@ -1,22 +1,31 @@
-/* Copyright (C) 2018 by John Schember <john@nachtimwald.com>
+/* MIT License
  *
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies and that both that copyright
- * notice and this permission notice appear in supporting
- * documentation, and that the name of M.I.T. not be used in
- * advertising or publicity pertaining to distribution of the
- * software without specific, written prior permission.
- * M.I.T. makes no representations about the suitability of
- * this software for any purpose.  It is provided "as is"
- * without express or implied warranty.
+ * Copyright (c) 2018 John Schember
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  *
  * SPDX-License-Identifier: MIT
  */
 
 #if defined(__MVS__)
-#include <strings.h>
+#  include <strings.h>
 #endif
 
 #include "ares_setup.h"
@@ -27,28 +36,35 @@ void ares__strsplit_free(char **elms, size_t num_elm)
 {
   size_t i;
 
-  if (elms == NULL)
+  if (elms == NULL) {
     return;
+  }
 
-  for (i=0; i<num_elm; i++)
+  for (i = 0; i < num_elm; i++) {
     ares_free(elms[i]);
+  }
   ares_free(elms);
 }
 
-char **ares__strsplit(const char *in, const char *delms, size_t *num_elm) {
+char **ares__strsplit(const char *in, const char *delms, size_t *num_elm)
+{
   const char *p;
-  char **table;
-  void *tmp;
-  size_t i, j, k, count;
+  char      **table;
+  void       *tmp;
+  size_t      i;
+  size_t      j;
+  size_t      k;
+  size_t      count;
 
-  if (in == NULL || delms == NULL || num_elm == NULL)
+  if (in == NULL || delms == NULL || num_elm == NULL) {
     return NULL;
+  }
 
   *num_elm = 0;
 
   /* count non-empty delimited substrings */
   count = 0;
-  p = in;
+  p     = in;
   do {
     i = strcspn(p, delms);
     if (i != 0) {
@@ -58,11 +74,13 @@ char **ares__strsplit(const char *in, const char *delms, size_t *num_elm) {
     }
   } while (*p++ != 0);
 
-  if (count == 0)
+  if (count == 0) {
     return NULL;
+  }
   table = ares_malloc(count * sizeof(*table));
-  if (table == NULL)
+  if (table == NULL) {
     return NULL;
+  }
 
   j = 0; /* current table entry */
   /* re-calculate indices and allocate new strings for table */
@@ -70,8 +88,9 @@ char **ares__strsplit(const char *in, const char *delms, size_t *num_elm) {
     i = strcspn(p, delms);
     if (i != 0) {
       for (k = 0; k < j; k++) {
-        if (strncasecmp(table[k], p, i) == 0 && table[k][i] == 0)
+        if (strncasecmp(table[k], p, i) == 0 && table[k][i] == 0) {
           break;
+        }
       }
       if (k == j) {
         /* copy unique strings only */
@@ -80,16 +99,18 @@ char **ares__strsplit(const char *in, const char *delms, size_t *num_elm) {
           ares__strsplit_free(table, j);
           return NULL;
         }
-        strncpy(table[j], p, i);
-        table[j++][i] = 0;
-      } else
+        ares_strcpy(table[j], p, i + 1);
+        j++;
+      } else {
         count--;
+      }
     }
   }
 
-  tmp = ares_realloc(table, count * sizeof (*table));
-  if (tmp != NULL)
+  tmp = ares_realloc(table, count * sizeof(*table));
+  if (tmp != NULL) {
     table = tmp;
+  }
 
   *num_elm = count;
   return table;

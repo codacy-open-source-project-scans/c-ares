@@ -33,7 +33,6 @@ extern "C" {
 #undef PACKAGE_TARNAME
 // ... so we can include the library's config without symbol redefinitions.
 #include "ares_setup.h"
-#include "ares_nowarn.h"
 #include "ares_inet_net_pton.h"
 #include "ares_data.h"
 #include "ares_strsplit.h"
@@ -298,20 +297,6 @@ TEST(Misc, Bitncmp) {
   EXPECT_GT(0, ares__bitncmp(a, b, 3*8 + 7));
 }
 
-TEST_F(LibraryTest, Casts) {
-  ares_ssize_t ssz = 100;
-  unsigned int u = 100;
-  int i = 100;
-  long l = 100;
-
-  unsigned int ru = aresx_sztoui(ssz);
-  EXPECT_EQ(u, ru);
-  int ri = aresx_sztosi(ssz);
-  EXPECT_EQ(i, ri);
-
-  ri = aresx_sltosi(l);
-  EXPECT_EQ(l, (long)ri);
-}
 
 TEST_F(LibraryTest, ReadLine) {
   TempFile temp("abcde\n0123456789\nXYZ\n012345678901234567890\n\n");
@@ -525,6 +510,22 @@ TEST(Misc, OnionDomain) {
   EXPECT_EQ(1, ares__is_onion_domain("YES.ONION"));
   EXPECT_EQ(1, ares__is_onion_domain("YES.ONION."));
 }
+
+TEST_F(LibraryTest, CatDomain) {
+  char *s;
+
+  ares__cat_domain("foo", "example.net", &s);
+  EXPECT_STREQ("foo.example.net", s);
+  ares_free(s);
+
+  ares__cat_domain("foo", ".", &s);
+  EXPECT_STREQ("foo.", s);
+  ares_free(s);
+
+  ares__cat_domain("foo", "example.net.", &s);
+  EXPECT_STREQ("foo.example.net.", s);
+  ares_free(s);
+}
 #endif
 
 #ifdef CARES_EXPOSE_STATICS
@@ -542,7 +543,7 @@ TEST_F(LibraryTest, Striendstr) {
   const char *str = "plugh";
   EXPECT_NE(nullptr, ares_striendstr(str, str));
 }
-extern "C" int ares__single_domain(ares_channel, const char*, char**);
+extern "C" ares_status_t ares__single_domain(ares_channel, const char*, char**);
 TEST_F(DefaultChannelTest, SingleDomain) {
   TempFile aliases("www www.google.com\n");
   EnvValue with_env("HOSTALIASES", aliases.filename());
@@ -565,7 +566,7 @@ TEST_F(DefaultChannelTest, SingleDomain) {
 
 TEST_F(DefaultChannelTest, SaveInvalidChannel) {
   int saved = channel_->nservers;
-  channel_->nservers = -1;
+  channel_->nservers = 0;
   struct ares_options opts;
   int optmask = 0;
   EXPECT_EQ(ARES_ENODATA, ares_save_options(channel_, &opts, &optmask));
@@ -622,26 +623,10 @@ const struct ares_socket_functions VirtualizeIO::default_functions = {
     }
     return s;
   },
-  [](ares_socket_t s, void * p) {
-    return :: sclose(s);
-  },
-  [](ares_socket_t s, const struct sockaddr * addr, socklen_t len, void *) {
-    return ::connect(s, addr, len);
-  },
-  [](ares_socket_t s, void * dst, size_t len, int flags, struct sockaddr * addr, socklen_t * alen, void *) -> ares_ssize_t {
-#ifdef HAVE_RECVFROM
-    return ::recvfrom(s, reinterpret_cast<RECV_TYPE_ARG2>(dst), len, flags, addr, alen);
-#else
-    return sread(s, dst, len);
-#endif
-  },
-  [](ares_socket_t s, const struct iovec * vec, int len, void *) {
-#ifndef HAVE_WRITEV
-    return ares_writev(s, vec, len);
-#else
-    return :: writev(s, vec, len);
-#endif
-  }
+  NULL,
+  NULL,
+  NULL,
+  NULL
 };
 
 

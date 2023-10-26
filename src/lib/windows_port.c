@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright (C) the Massachusetts Institute of Technology.
+ * Copyright (c) 1998 Massachusetts Institute of Technology
  * Copyright (C) Daniel Stenberg
  *
  * SPDX-License-Identifier: MIT
@@ -13,18 +13,17 @@
  */
 #if (defined(WIN32) || defined(WATT32)) && !defined(MSDOS)
 
-#ifdef __WATCOMC__
+#  ifdef __WATCOMC__
 /*
  * Watcom needs a DllMain() in order to initialise the clib startup code.
  */
-BOOL
-WINAPI DllMain (HINSTANCE hnd, DWORD reason, LPVOID reserved)
+BOOL WINAPI DllMain(HINSTANCE hnd, DWORD reason, LPVOID reserved)
 {
-  (void) hnd;
-  (void) reason;
-  (void) reserved;
+  (void)hnd;
+  (void)reason;
+  (void)reserved;
   return (TRUE);
 }
-#endif
+#  endif
 
 #endif /* WIN32 builds only */
