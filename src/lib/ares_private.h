@@ -79,7 +79,7 @@
 #  define INTERFACES_KEY       "Interfaces"
 #  define DOMAIN_KEY           "Domain"
 #  define DHCPDOMAIN_KEY       "DhcpDomain"
-#  define PATH_RESOLV_CONF     NULL
+#  define PATH_RESOLV_CONF     ""
 #elif defined(WATT32)
 
 #  define PATH_RESOLV_CONF "/dev/ENV/etc/resolv.conf"
@@ -92,7 +92,7 @@ W32_FUNC const char *_w32_GetHostsFile(void);
 
 #elif defined(__riscos__)
 
-#  define PATH_RESOLV_CONF NULL
+#  define PATH_RESOLV_CONF ""
 #  define PATH_HOSTS       "InetDBase:Hosts"
 
 #elif defined(__HAIKU__)
@@ -122,7 +122,7 @@ typedef struct ares_rand_state ares_rand_state;
 #include "ares__htable_szvp.h"
 #include "ares__htable_asvp.h"
 #include "ares__buf.h"
-#include "ares_dns_record.h"
+#include "ares_dns_private.h"
 
 #ifndef HAVE_GETENV
 #  include "ares_getenv.h"
@@ -151,14 +151,6 @@ typedef struct ares_rand_state ares_rand_state;
 
 /********* EDNS defines section ******/
 
-struct ares_addr {
-  int family;
-
-  union {
-    struct in_addr       addr4;
-    struct ares_in6_addr addr6;
-  } addr;
-};
 
 struct query;
 
@@ -215,13 +207,10 @@ struct query {
   /* connection handle query is associated with */
   struct server_connection *conn;
 
-  /* Query buf with length at beginning, for TCP transmission */
-  unsigned char            *tcpbuf;
-  size_t                    tcplen;
-
-  /* Arguments passed to ares_send() (qbuf points into tcpbuf) */
-  const unsigned char      *qbuf;
+  /* Arguments passed to ares_send() */
+  unsigned char            *qbuf;
   size_t                    qlen;
+
   ares_callback             callback;
   void                     *arg;
 
@@ -263,6 +252,7 @@ struct ares_channeldata {
   size_t               timeout; /* in milliseconds */
   size_t               tries;
   size_t               ndots;
+  size_t               maxtimeout;                 /* in milliseconds */
   ares_bool_t          rotate;
   unsigned short       udp_port;                   /* stored in network order */
   unsigned short       tcp_port;                   /* stored in network order */
@@ -287,7 +277,8 @@ struct ares_channeldata {
    * failures, followed by the configuration order if failures are equal. */
   ares__slist_t       *servers;
 
-  /* random state to use when generating new ids */
+  /* random state to use when generating new ids and generating retry penalties
+   */
   ares_rand_state     *rand_state;
 
   /* All active queries in a single list */
@@ -356,7 +347,8 @@ ares_status_t ares_query_qid(ares_channel_t *channel, const char *name,
 /* Identical to ares_send() except returns normal ares return codes like
  * ARES_SUCCESS */
 ares_status_t ares_send_ex(ares_channel_t *channel, const unsigned char *qbuf,
-                           size_t qlen, ares_callback callback, void *arg);
+                           size_t qlen, ares_callback callback, void *arg,
+                           unsigned short *qid);
 void          ares__close_connection(struct server_connection *conn);
 void          ares__close_sockets(struct server_state *server);
 void          ares__check_cleanup_conn(const ares_channel_t     *channel,
@@ -500,6 +492,46 @@ ares_status_t ares__hosts_entry_to_addrinfo(const ares_hosts_entry_t *entry,
                                             unsigned short        port,
                                             ares_bool_t           want_cnames,
                                             struct ares_addrinfo *ai);
+ares_bool_t   ares__isprint(int ch);
+
+
+/*! Parse a compressed DNS name as defined in RFC1035 starting at the current
+ *  offset within the buffer.
+ *
+ *  It is assumed that either a const buffer is being used, or before
+ *  the message processing was started that ares__buf_reclaim() was called.
+ *
+ *  \param[in]  buf        Initialized buffer object
+ *  \param[out] name       Pointer passed by reference to be filled in with
+ *                         allocated string of the parsed name that must be
+ *                         ares_free()'d by the caller.
+ *  \param[in] is_hostname if ARES_TRUE, will validate the character set for
+ *                         a valid hostname or will return error.
+ *  \return ARES_SUCCESS on success
+ */
+ares_status_t ares__dns_name_parse(ares__buf_t *buf, char **name,
+                                   ares_bool_t is_hostname);
+
+/*! Write the DNS name to the buffer in the DNS domain-name syntax as a
+ *  series of labels.  The maximum domain name length is 255 characters with
+ *  each label being a maximum of 63 characters.  If the validate_hostname
+ *  flag is set, it will strictly validate the character set.
+ *
+ *  \param[in,out]  buf   Initialized buffer object to write name to
+ *  \param[in,out]  list  Pointer passed by reference to maintain a list of
+ *                        domain name to indexes used for name compression.
+ *                        Pass NULL (not by reference) if name compression isn't
+ *                        desired.  Otherwise the list will be automatically
+ *                        created upon first entry.
+ *  \param[in]      validate_hostname Validate the hostname character set.
+ *  \param[in]      name              Name to write out, it may have escape
+ *                                    sequences.
+ *  \return ARES_SUCCESS on success, most likely ARES_EBADNAME if the name is
+ *          bad.
+ */
+ares_status_t ares__dns_name_write(ares__buf_t *buf, ares__llist_t **list,
+                                   ares_bool_t validate_hostname,
+                                   const char *name);
 
 #define ARES_SWAP_BYTE(a, b)           \
   do {                                 \
@@ -521,5 +553,9 @@ ares_status_t ares__hosts_entry_to_addrinfo(const ares_hosts_entry_t *entry,
 
 size_t ares__round_up_pow2(size_t n);
 size_t ares__log2(size_t n);
+size_t ares__pow(size_t x, size_t y);
+size_t ares__count_digits(size_t n);
+size_t ares__count_hexdigits(size_t n);
+
 
 #endif /* __ARES_PRIVATE_H */
