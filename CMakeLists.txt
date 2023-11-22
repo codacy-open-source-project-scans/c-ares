@@ -12,9 +12,7 @@ INCLUDE (CheckCSourceCompiles)
 INCLUDE (CheckStructHasMember)
 INCLUDE (CheckLibraryExists)
 
-PROJECT (c-ares LANGUAGES C VERSION "1.21.0" )
-
-INCLUDE (EnableWarnings)
+PROJECT (c-ares LANGUAGES C VERSION "1.22.1" )
 
 # Set this version before release
 SET (CARES_VERSION "${PROJECT_VERSION}")
@@ -32,7 +30,7 @@ INCLUDE (GNUInstallDirs) # include this *AFTER* PROJECT(), otherwise paths are w
 # For example, a version of 4:0:2 would generate output such as:
 #    libname.so   -> libname.so.2
 #    libname.so.2 -> libname.so.2.2.0
-SET (CARES_LIB_VERSIONINFO "9:2:7")
+SET (CARES_LIB_VERSIONINFO "10:1:8")
 
 
 OPTION (CARES_STATIC     "Build as a static library"                                             OFF)
@@ -46,12 +44,22 @@ OPTION (CARES_SYMBOL_HIDING "Hide private symbols in shared libraries"          
 SET    (CARES_RANDOM_FILE "/dev/urandom" CACHE STRING "Suitable File / Device Path for entropy, such as /dev/urandom")
 
 
+# Tests require a C++ compiler
+IF (CARES_BUILD_TESTS OR CARES_BUILD_CONTAINER_TESTS)
+	set(CMAKE_CXX_STANDARD 11)
+	set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+	set(CMAKE_CXX_EXTENSIONS FALSE)
+	enable_language(CXX)
+ENDIF ()
+
 # Tests require static to be enabled on Windows to be able to access otherwise hidden symbols
-IF (CARES_BUILD_TESTS AND (NOT CARES_STATIC) AND WIN32)
+IF ((CARES_BUILD_TESTS OR CARES_BUILD_CONTAINER_TESTS) AND (NOT CARES_STATIC) AND WIN32)
 	SET (CARES_STATIC ON)
 	SET (CARES_STATIC_PIC ON)
 	MESSAGE (WARNING "Static building was requested be disabled, but reenabled to support tests")
 ENDIF ()
+
+INCLUDE (EnableWarnings)
 
 # allow linking against the static runtime library in msvc
 IF (MSVC)
@@ -219,8 +227,6 @@ CHECK_INCLUDE_FILES (sys/uio.h             HAVE_SYS_UIO_H)
 CHECK_INCLUDE_FILES (time.h                HAVE_TIME_H)
 CHECK_INCLUDE_FILES (dlfcn.h               HAVE_DLFCN_H)
 CHECK_INCLUDE_FILES (unistd.h              HAVE_UNISTD_H)
-CHECK_INCLUDE_FILES (iphlpapi.h            HAVE_IPHLPAPI_H)
-
 # On OpenBSD, you must include sys/types.h before netinet/tcp.h
 IF (HAVE_SYS_TYPES_H)
   CHECK_INCLUDE_FILES ("sys/types.h;netinet/tcp.h"         HAVE_NETINET_TCP_H)
@@ -234,6 +240,8 @@ ENDIF ()
 IF (WIN32)
 CHECK_INCLUDE_FILES ("winsock2.h;windows.h"            HAVE_WINSOCK2_H)
 CHECK_INCLUDE_FILES ("winsock2.h;ws2tcpip.h;windows.h" HAVE_WS2TCPIP_H)
+CHECK_INCLUDE_FILES ("winsock2.h;iphlpapi.h;windows.h" HAVE_IPHLPAPI_H)
+CHECK_INCLUDE_FILES ("winsock2.h;netioapi.h;windows.h" HAVE_NETIOAPI_H)
 CHECK_INCLUDE_FILES ("winsock.h;windows.h"             HAVE_WINSOCK_H)
 CHECK_INCLUDE_FILES (windows.h                         HAVE_WINDOWS_H)
 ENDIF ()

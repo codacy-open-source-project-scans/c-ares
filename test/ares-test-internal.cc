@@ -283,7 +283,7 @@ TEST(Misc, Bitncmp) {
   EXPECT_LT(0, ares__bitncmp(b, a, sizeof(a)*8));
   EXPECT_EQ(0, ares__bitncmp(a, a, sizeof(a)*8));
 
-  for (int ii = 1; ii < (3*8+5); ii++) {
+  for (size_t ii = 1; ii < (3*8+5); ii++) {
     EXPECT_EQ(0, ares__bitncmp(a, b, ii));
     EXPECT_EQ(0, ares__bitncmp(b, a, ii));
     EXPECT_LT(0, ares__bitncmp(a, c, ii));
@@ -721,6 +721,112 @@ TEST_F(LibraryTest, DNSRecord) {
   EXPECT_EQ(ancount, ares_dns_record_rr_cnt(dnsrec, ARES_SECTION_ANSWER));
   EXPECT_EQ(nscount, ares_dns_record_rr_cnt(dnsrec, ARES_SECTION_AUTHORITY));
   EXPECT_EQ(arcount, ares_dns_record_rr_cnt(dnsrec, ARES_SECTION_ADDITIONAL));
+
+  /* Iterate and print */
+  ares__buf_t *printmsg = ares__buf_create();
+  ares__buf_append_str(printmsg, ";; ->>HEADER<<- opcode: ");
+  ares__buf_append_str(printmsg, ares_dns_opcode_tostr(ares_dns_record_get_opcode(dnsrec)));
+  ares__buf_append_str(printmsg, ", status: ");
+  ares__buf_append_str(printmsg, ares_dns_rcode_tostr(ares_dns_record_get_rcode(dnsrec)));
+  ares__buf_append_str(printmsg, ", id: ");
+  ares__buf_append_num_dec(printmsg, (size_t)ares_dns_record_get_id(dnsrec), 0);
+  ares__buf_append_str(printmsg, "\n;; flags: ");
+  ares__buf_append_num_hex(printmsg, (size_t)ares_dns_record_get_flags(dnsrec), 0);
+  ares__buf_append_str(printmsg, "; QUERY: ");
+  ares__buf_append_num_dec(printmsg, ares_dns_record_query_cnt(dnsrec), 0);
+  ares__buf_append_str(printmsg, ", ANSWER: ");
+  ares__buf_append_num_dec(printmsg, ares_dns_record_rr_cnt(dnsrec, ARES_SECTION_ANSWER), 0);
+  ares__buf_append_str(printmsg, ", AUTHORITY: ");
+  ares__buf_append_num_dec(printmsg, ares_dns_record_rr_cnt(dnsrec, ARES_SECTION_AUTHORITY), 0);
+  ares__buf_append_str(printmsg, ", ADDITIONAL: ");
+  ares__buf_append_num_dec(printmsg, ares_dns_record_rr_cnt(dnsrec, ARES_SECTION_ADDITIONAL), 0);
+  ares__buf_append_str(printmsg, "\n\n");
+  ares__buf_append_str(printmsg, ";; QUESTION SECTION:\n");
+  for (size_t i = 0; i < ares_dns_record_query_cnt(dnsrec); i++) {
+    const char         *name;
+    ares_dns_rec_type_t qtype;
+    ares_dns_class_t    qclass;
+    ares_dns_record_query_get(dnsrec, i, &name, &qtype, &qclass);
+    ares__buf_append_str(printmsg, ";");
+    ares__buf_append_str(printmsg, name);
+    ares__buf_append_str(printmsg, ".\t\t\t");
+    ares__buf_append_str(printmsg, ares_dns_class_tostr(qclass));
+    ares__buf_append_str(printmsg, "\t");
+    ares__buf_append_str(printmsg, ares_dns_rec_type_tostr(qtype));
+    ares__buf_append_str(printmsg, "\n");
+  }
+  ares__buf_append_str(printmsg, "\n");
+  for (size_t i = ARES_SECTION_ANSWER; i < ARES_SECTION_ADDITIONAL + 1; i++) {
+    ares__buf_append_str(printmsg, ";; ");
+    ares__buf_append_str(printmsg, ares_dns_section_tostr((ares_dns_section_t)i));
+    ares__buf_append_str(printmsg, " SECTION:\n");
+    for (size_t j = 0; j < ares_dns_record_rr_cnt(dnsrec, (ares_dns_section_t)i); j++) {
+      const ares_dns_rr_t *rr = ares_dns_record_rr_get(dnsrec, (ares_dns_section_t)i, j);
+      ares__buf_append_str(printmsg, ares_dns_rr_get_name(rr));
+      ares__buf_append_str(printmsg, ".\t\t\t");
+      ares__buf_append_str(printmsg, ares_dns_class_tostr(ares_dns_rr_get_class(rr)));
+      ares__buf_append_str(printmsg, "\t");
+      ares__buf_append_str(printmsg, ares_dns_rec_type_tostr(ares_dns_rr_get_type(rr)));
+      ares__buf_append_str(printmsg, "\t");
+      ares__buf_append_num_dec(printmsg, ares_dns_rr_get_ttl(rr), 0);
+      ares__buf_append_str(printmsg, "\t");
+
+      size_t keys_cnt;
+      const ares_dns_rr_key_t *keys = ares_dns_rr_get_keys(ares_dns_rr_get_type(rr), &keys_cnt);
+      for (size_t k = 0; k<keys_cnt; k++) {
+        char buf[256] = "";
+        ares__buf_append_str(printmsg, ares_dns_rr_key_tostr(keys[k]));
+        ares__buf_append_str(printmsg, "=");
+        switch (ares_dns_rr_key_datatype(keys[k])) {
+          case ARES_DATATYPE_INADDR:
+            ares_inet_ntop(AF_INET, ares_dns_rr_get_addr(rr, keys[k]), buf, sizeof(buf));
+            ares__buf_append_str(printmsg, buf);
+            break;
+          case ARES_DATATYPE_INADDR6:
+            ares_inet_ntop(AF_INET6, ares_dns_rr_get_addr6(rr, keys[k]), buf, sizeof(buf));
+            ares__buf_append_str(printmsg, buf);
+            break;
+          case ARES_DATATYPE_U8:
+            ares__buf_append_num_dec(printmsg, ares_dns_rr_get_u8(rr, keys[k]), 0);
+            break;
+          case ARES_DATATYPE_U16:
+            ares__buf_append_num_dec(printmsg, ares_dns_rr_get_u16(rr, keys[k]), 0);
+            break;
+          case ARES_DATATYPE_U32:
+            ares__buf_append_num_dec(printmsg, ares_dns_rr_get_u32(rr, keys[k]), 0);
+            break;
+          case ARES_DATATYPE_NAME:
+          case ARES_DATATYPE_STR:
+            ares__buf_append_byte(printmsg, '"');
+            ares__buf_append_str(printmsg, ares_dns_rr_get_str(rr, keys[k]));
+            ares__buf_append_byte(printmsg, '"');
+            break;
+          case ARES_DATATYPE_BIN:
+            /* TODO */
+            break;
+          case ARES_DATATYPE_BINP:
+            ares__buf_append_byte(printmsg, '"');
+            size_t templen;
+            ares__buf_append_str(printmsg, (const char *)ares_dns_rr_get_bin(rr, keys[k], &templen));
+            ares__buf_append_byte(printmsg, '"');
+            break;
+          case ARES_DATATYPE_OPT:
+            /* TODO */
+            break;
+        }
+        ares__buf_append_str(printmsg, " ");
+      }
+      ares__buf_append_str(printmsg, "\n");
+    }
+  }
+  ares__buf_append_str(printmsg, ";; SIZE: ");
+  ares__buf_append_num_dec(printmsg, msglen, 0);
+  ares__buf_append_str(printmsg, "\n\n");
+
+  char *printdata = ares__buf_finish_str(printmsg, NULL);
+  //printf("%s", printdata);
+  ares_free(printdata);
+
   ares_dns_record_destroy(dnsrec);
   ares_free(msg);
 }
@@ -755,16 +861,16 @@ TEST_F(LibraryTest, BufMisuse) {
   EXPECT_NE(ARES_SUCCESS, ares__buf_tag_rollback(NULL));
   EXPECT_NE(ARES_SUCCESS, ares__buf_tag_clear(NULL));
   EXPECT_EQ(NULL, ares__buf_tag_fetch(NULL, NULL));
-  EXPECT_EQ(0, ares__buf_tag_length(NULL));
+  EXPECT_EQ((size_t)0, ares__buf_tag_length(NULL));
   EXPECT_NE(ARES_SUCCESS, ares__buf_tag_fetch_bytes(NULL, NULL, NULL));
   EXPECT_NE(ARES_SUCCESS, ares__buf_tag_fetch_string(NULL, NULL, 0));
   EXPECT_NE(ARES_SUCCESS, ares__buf_fetch_bytes_dup(NULL, 0, ARES_FALSE, NULL));
   EXPECT_NE(ARES_SUCCESS, ares__buf_fetch_str_dup(NULL, 0, NULL));
-  EXPECT_EQ(0, ares__buf_consume_whitespace(NULL, ARES_FALSE));
-  EXPECT_EQ(0, ares__buf_consume_nonwhitespace(NULL));
-  EXPECT_EQ(0, ares__buf_consume_line(NULL, ARES_FALSE));
+  EXPECT_EQ((size_t)0, ares__buf_consume_whitespace(NULL, ARES_FALSE));
+  EXPECT_EQ((size_t)0, ares__buf_consume_nonwhitespace(NULL));
+  EXPECT_EQ((size_t)0, ares__buf_consume_line(NULL, ARES_FALSE));
   EXPECT_NE(ARES_SUCCESS, ares__buf_begins_with(NULL, NULL, 0));
-  EXPECT_EQ(0, ares__buf_get_position(NULL));
+  EXPECT_EQ((size_t)0, ares__buf_get_position(NULL));
   EXPECT_NE(ARES_SUCCESS, ares__buf_set_position(NULL, 0));
   EXPECT_NE(ARES_SUCCESS, ares__dns_name_parse(NULL, NULL, ARES_FALSE));
   EXPECT_NE(ARES_SUCCESS, ares__buf_parse_dns_binstr(NULL, 0, NULL, NULL, ARES_FALSE));
@@ -775,28 +881,28 @@ TEST_F(LibraryTest, HtableMisuse) {
   EXPECT_EQ(ARES_FALSE, ares__htable_insert(NULL, NULL));
   EXPECT_EQ(NULL, ares__htable_get(NULL, NULL));
   EXPECT_EQ(ARES_FALSE, ares__htable_remove(NULL, NULL));
-  EXPECT_EQ(0, ares__htable_num_keys(NULL));
+  EXPECT_EQ((size_t)0, ares__htable_num_keys(NULL));
 }
 
 TEST_F(LibraryTest, HtableAsvpMisuse) {
   EXPECT_EQ(ARES_FALSE, ares__htable_asvp_insert(NULL, ARES_SOCKET_BAD, NULL));
   EXPECT_EQ(ARES_FALSE, ares__htable_asvp_get(NULL, ARES_SOCKET_BAD, NULL));
   EXPECT_EQ(ARES_FALSE, ares__htable_asvp_remove(NULL, ARES_SOCKET_BAD));
-  EXPECT_EQ(0, ares__htable_asvp_num_keys(NULL));
+  EXPECT_EQ((size_t)0, ares__htable_asvp_num_keys(NULL));
 }
 
 TEST_F(LibraryTest, HtableStrvpMisuse) {
   EXPECT_EQ(ARES_FALSE, ares__htable_strvp_insert(NULL, NULL, NULL));
   EXPECT_EQ(ARES_FALSE, ares__htable_strvp_get(NULL, NULL, NULL));
   EXPECT_EQ(ARES_FALSE, ares__htable_strvp_remove(NULL, NULL));
-  EXPECT_EQ(0, ares__htable_strvp_num_keys(NULL));
+  EXPECT_EQ((size_t)0, ares__htable_strvp_num_keys(NULL));
 }
 
 TEST_F(LibraryTest, HtableSzvpMisuse) {
   EXPECT_EQ(ARES_FALSE, ares__htable_szvp_insert(NULL, 0, NULL));
   EXPECT_EQ(ARES_FALSE, ares__htable_szvp_get(NULL, 0, NULL));
   EXPECT_EQ(ARES_FALSE, ares__htable_szvp_remove(NULL, 0));
-  EXPECT_EQ(0, ares__htable_szvp_num_keys(NULL));
+  EXPECT_EQ((size_t)0, ares__htable_szvp_num_keys(NULL));
 }
 
 TEST_F(LibraryTest, LlistMisuse) {
@@ -806,7 +912,7 @@ TEST_F(LibraryTest, LlistMisuse) {
   EXPECT_EQ(NULL, ares__llist_node_last(NULL));
   EXPECT_EQ(NULL, ares__llist_node_next(NULL));
   EXPECT_EQ(NULL, ares__llist_node_prev(NULL));
-  EXPECT_EQ(0, ares__llist_len(NULL));
+  EXPECT_EQ((size_t)0, ares__llist_len(NULL));
   EXPECT_EQ(NULL, ares__llist_node_parent(NULL));
   EXPECT_EQ(NULL, ares__llist_node_claim(NULL));
   ares__llist_node_replace(NULL, NULL);
@@ -822,7 +928,7 @@ TEST_F(LibraryTest, SlistMisuse) {
   EXPECT_EQ(NULL, ares__slist_node_next(NULL));
   EXPECT_EQ(NULL, ares__slist_node_prev(NULL));
   EXPECT_EQ(NULL, ares__slist_node_val(NULL));
-  EXPECT_EQ(0, ares__slist_len(NULL));
+  EXPECT_EQ((size_t)0, ares__slist_len(NULL));
   EXPECT_EQ(NULL, ares__slist_node_parent(NULL));
   EXPECT_EQ(NULL, ares__slist_first_val(NULL));
   EXPECT_EQ(NULL, ares__slist_last_val(NULL));

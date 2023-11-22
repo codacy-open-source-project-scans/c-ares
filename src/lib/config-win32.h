@@ -84,8 +84,22 @@
 #  define HAVE_WS2TCPIP_H 1
 #endif
 
+/* Define if you have <iphlpapi.h> header file */
+#define HAVE_IPHLPAPI_H 1
+
+/* Define if you have <netioapi.h> header file */
+#ifndef __WATCOMC__
+#  define HAVE_NETIOAPI_H 1
+#endif
+
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_SYS_STAT_H  1
+
+/* If we are building with OpenWatcom, we need to specify that we have
+ * <stdint.h>. */
+#if defined(__WATCOMC__)
+#  define HAVE_STDINT_H
+#endif
 
 /* ---------------------------------------------------------------- */
 /*                        OTHER HEADER INFO                         */

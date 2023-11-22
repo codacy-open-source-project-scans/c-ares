@@ -106,7 +106,7 @@ static void server_set_good(struct server_state *server)
 ares_bool_t ares__timedout(const struct timeval *now,
                            const struct timeval *check)
 {
-  time_t secs = (now->tv_sec - check->tv_sec);
+  ares_int64_t secs = ((ares_int64_t)now->tv_sec - (ares_int64_t)check->tv_sec);
 
   if (secs > 0) {
     return ARES_TRUE; /* yes, timed out */
@@ -116,7 +116,9 @@ ares_bool_t ares__timedout(const struct timeval *now,
   }
 
   /* if the full seconds were identical, check the sub second parts */
-  return (now->tv_usec - check->tv_usec) >= 0 ? ARES_TRUE : ARES_FALSE;
+  return ((ares_int64_t)now->tv_usec - (ares_int64_t)check->tv_usec) >= 0
+           ? ARES_TRUE
+           : ARES_FALSE;
 }
 
 /* add the specific number of milliseconds to the time in the first argument */
@@ -713,6 +715,12 @@ static ares_status_t process_answer(ares_channel_t      *channel,
     }
   }
 
+  /* If cache insertion was successful, it took ownership.  We ignore
+   * other cache insertion failures. */
+  if (ares_qcache_insert(channel, now, query, rdnsrec) == ARES_SUCCESS) {
+    rdnsrec = NULL;
+  }
+
   server_set_good(server);
   end_query(channel, query, ARES_SUCCESS, abuf, alen);
 
@@ -766,11 +774,17 @@ static struct server_state *ares__random_server(ares_channel_t *channel)
   size_t              cnt;
   size_t              idx;
   ares__slist_node_t *node;
+  size_t              num_servers = ares__slist_len(channel->servers);
+
+  /* Silence coverity, not possible */
+  if (num_servers == 0) {
+    return NULL;
+  }
 
   ares__rand_bytes(channel->rand_state, &c, 1);
 
   cnt = c;
-  idx = cnt % ares__slist_len(channel->servers);
+  idx = cnt % num_servers;
 
   cnt = 0;
   for (node = ares__slist_node_first(channel->servers); node != NULL;
@@ -802,10 +816,15 @@ static size_t ares__calc_query_timeout(const struct query *query)
   const ares_channel_t *channel  = query->channel;
   size_t                timeplus = channel->timeout;
   size_t                rounds;
+  size_t                num_servers = ares__slist_len(channel->servers);
+
+  if (num_servers == 0) {
+    return 0;
+  }
 
   /* For each trip through the entire server list, we want to double the
    * retry from the last retry */
-  rounds = (query->try_count / ares__slist_len(channel->servers));
+  rounds = (query->try_count / num_servers);
 
   if (rounds > 0) {
     timeplus <<= rounds;
@@ -859,6 +878,11 @@ ares_status_t ares__send_query(struct query *query, struct timeval *now)
   } else {
     /* Pull first */
     server = ares__slist_first_val(channel->servers);
+  }
+
+  if (server == NULL) {
+    end_query(channel, query, ARES_ESERVFAIL /* ? */, NULL, 0);
+    return ARES_ECONNREFUSED;
   }
 
   if (query->using_tcp) {

@@ -1,39 +1,22 @@
-c-ares version 1.21.0
+c-ares version 1.22.1
 
-This is a bugfix and cleanup release with some significant internal changes.
-
-Changes:
- o Provide better man page cross-links. [1]
- o Introduce ares_status_t as an enum rather than using #define list and
-   integer data type for internal functions. [2]
- o Introduce ares_bool_t datatype rather than using an integer with 0/1 so
-   it is clear based on the function prototype what it returns. [5]
- o Increase compiler warning levels by default. [6]
- o Use size_t and other more proper datatypes internally (rather than int). [7]
- o Many developers have used different code styles over the years, standardize
-   on one and use clang-format to enforce the style. [8]
- o CMake can now control symbol visibility [9]
- o Replace multiple DNS hand-made parsers with new memory-safe DNS message
-   parser. [10]
+This is a bugfix release.
 
 Bug Fixes:
- o Tools: STAYOPEN flag could make tools not terminate. [3]
- o Socket callbacks were passed SOCK_STREAM instead of SOCK_DGRAM on udp. [4]
+ o Fix /etc/hosts processing performance with all entries using same IP
+   address. Large hosts files using the same IP address for all entries
+   could use exponential time. [1]
+ o Fix typos in manpages [2]
+ o Fix OpenWatcom building [3]
 
 Thanks go to these friendly people for their efforts and contributions:
   Brad House (@bradh352)
   Daniel Stenberg (@bagder)
+  Douglas R. Reno (@renodr)
   Gregor Jasny (@gjasny)
-(3 contributors)
+(4 contributors)
 
 References to bug reports and discussions on issues:
- [1] = https://github.com/c-ares/c-ares/pull/565
- [2] = https://github.com/c-ares/c-ares/pull/567
- [3] = https://github.com/c-ares/c-ares/pull/569
- [4] = https://github.com/c-ares/c-ares/commit/a070d78
- [5] = https://github.com/c-ares/c-ares/pull/570
- [6] = https://github.com/c-ares/c-ares/pull/568
- [7] = https://github.com/c-ares/c-ares/pull/573
- [8] = https://github.com/c-ares/c-ares/pull/579
- [9] = https://github.com/c-ares/c-ares/pull/574
- [10] = https://github.com/c-ares/c-ares/pull/581
+ [1] = https://github.com/c-ares/c-ares/commit/a36317
+ [2] = https://github.com/c-ares/c-ares/pull/619
+ [3] = https://github.com/c-ares/c-ares/pull/623

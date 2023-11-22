@@ -67,10 +67,10 @@ extern std::vector<std::pair<int, bool>>       families_modes;
 
 // Process all pending work on ares-owned file descriptors, plus
 // optionally the given set-of-FDs + work function.
-void          ProcessWork(ares_channel_t                *channel,
-                          std::function<std::set<int>()> get_extrafds,
-                          std::function<void(int)>       process_extra);
-std::set<int> NoExtraFDs();
+void          ProcessWork(ares_channel_t                          *channel,
+                          std::function<std::set<ares_socket_t>()> get_extrafds,
+                          std::function<void(ares_socket_t)>       process_extra);
+std::set<ares_socket_t> NoExtraFDs();
 
 // Test fixture that ensures library initialization, and allows
 // memory allocations to be failed.
@@ -112,7 +112,12 @@ class DefaultChannelTest : public LibraryTest {
 public:
   DefaultChannelTest() : channel_(nullptr)
   {
-    EXPECT_EQ(ARES_SUCCESS, ares_init(&channel_));
+    /* Enable query cache for live tests */
+    struct ares_options opts;
+    memset(&opts, 0, sizeof(opts));
+    opts.qcache_max_ttl      = 300;
+    int optmask              = ARES_OPT_QUERY_CACHE;
+    EXPECT_EQ(ARES_SUCCESS, ares_init_options(&channel_, &opts, optmask));
     EXPECT_NE(nullptr, channel_);
   }
 
@@ -134,7 +139,8 @@ class FileChannelTest : public LibraryTest {
 public:
   FileChannelTest() : channel_(nullptr)
   {
-    struct ares_options opts = { 0 };
+    struct ares_options opts;
+    memset(&opts, 0, sizeof(opts));
     opts.lookups             = strdup("f");
     int optmask              = ARES_OPT_LOOKUPS;
     EXPECT_EQ(ARES_SUCCESS, ares_init_options(&channel_, &opts, optmask));
@@ -162,7 +168,8 @@ class DefaultChannelModeTest
 public:
   DefaultChannelModeTest() : channel_(nullptr)
   {
-    struct ares_options opts = { 0 };
+    struct ares_options opts;
+    memset(&opts, 0, sizeof(opts));
     opts.lookups             = strdup(GetParam().c_str());
     int optmask              = ARES_OPT_LOOKUPS;
     EXPECT_EQ(ARES_SUCCESS, ares_init_options(&channel_, &opts, optmask));
@@ -212,7 +219,7 @@ public:
 
   void Disconnect()
   {
-    for (int fd : connfds_) {
+    for (ares_socket_t fd : connfds_) {
       sclose(fd);
     }
     connfds_.clear();
@@ -222,10 +229,10 @@ public:
   }
 
   // The set of file descriptors that the server handles.
-  std::set<int> fds() const;
+  std::set<ares_socket_t> fds() const;
 
   // Process activity on a file descriptor.
-  void          ProcessFD(int fd);
+  void          ProcessFD(ares_socket_t fd);
 
   // Ports the server is responding to
   int           udpport() const
@@ -239,15 +246,15 @@ public:
   }
 
 private:
-  void ProcessRequest(int fd, struct sockaddr_storage *addr, int addrlen,
+  void ProcessRequest(ares_socket_t fd, struct sockaddr_storage *addr, ares_socklen_t addrlen,
                       int qid, const std::string &name, int rrtype);
-  void ProcessPacket(int fd, struct sockaddr_storage *addr, socklen_t addrlen,
+  void ProcessPacket(ares_socket_t fd, struct sockaddr_storage *addr, ares_socklen_t addrlen,
                      byte *data, int len);
   int  udpport_;
   int  tcpport_;
-  int  udpfd_;
-  int  tcpfd_;
-  std::set<int>     connfds_;
+  ares_socket_t  udpfd_;
+  ares_socket_t  tcpfd_;
+  std::set<ares_socket_t> connfds_;
   std::vector<byte> reply_;
   int               qid_;
   unsigned char    *tcp_data_;
@@ -270,8 +277,8 @@ protected:
   typedef testing::NiceMock<MockServer>                NiceMockServer;
   typedef std::vector<std::unique_ptr<NiceMockServer>> NiceMockServers;
 
-  std::set<int>                                        fds() const;
-  void                                                 ProcessFD(int fd);
+  std::set<ares_socket_t>                              fds() const;
+  void                                                 ProcessFD(ares_socket_t fd);
 
   static NiceMockServers BuildServers(int count, int family, int base_port);
 
