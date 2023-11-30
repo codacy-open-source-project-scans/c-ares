@@ -225,8 +225,8 @@ static ares_bool_t ares__htable_expand(ares__htable_t *htable)
 
     /* Slow path, collisions */
     while ((node = ares__llist_node_first(htable->buckets[i])) != NULL) {
-      const void  *val = ares__llist_node_val(node);
-      size_t       idx = HASH_IDX(htable, htable->bucket_key(val));
+      const void *val = ares__llist_node_val(node);
+      size_t      idx = HASH_IDX(htable, htable->bucket_key(val));
 
       /* Try fast path again as maybe we popped one collision off and the
        * next we can reuse the llist parent */
@@ -326,7 +326,7 @@ ares_bool_t ares__htable_insert(ares__htable_t *htable, void *bucket)
     return ARES_FALSE;
   }
 
-  /* Track collisions for rehash stablility */
+  /* Track collisions for rehash stability */
   if (ares__llist_len(htable->buckets[idx]) > 1) {
     htable->num_collisions++;
   }

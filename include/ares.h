@@ -290,8 +290,8 @@ struct ares_options {
   int            timeout; /* in seconds or milliseconds, depending on options */
   int            tries;
   int            ndots;
-  unsigned short udp_port;
-  unsigned short tcp_port;
+  unsigned short udp_port; /* host byte order */
+  unsigned short tcp_port; /* host byte order */
   int            socket_send_buffer_size;
   int            socket_receive_buffer_size;
   struct in_addr    *servers;
@@ -725,7 +725,7 @@ CARES_EXTERN int
                          ares_set_servers_ports(ares_channel_t                   *channel,
                                                 const struct ares_addr_port_node *servers);
 
-/* Incomming string format: host[:port][,host[:port]]... */
+/* Incoming string format: host[:port][,host[:port]]... */
 CARES_EXTERN int         ares_set_servers_csv(ares_channel_t *channel,
                                               const char     *servers);
 CARES_EXTERN int         ares_set_servers_ports_csv(ares_channel_t *channel,
@@ -741,6 +741,11 @@ CARES_EXTERN const char *ares_inet_ntop(int af, const void *src, char *dst,
 
 CARES_EXTERN int         ares_inet_pton(int af, const char *src, void *dst);
 
+/*! Whether or not the c-ares library was built with threadsafety
+ *
+ *  \return ARES_TRUE if built with threadsafety, ARES_FALSE if not
+ */
+CARES_EXTERN ares_bool_t ares_threadsafety(void);
 
 #ifdef __cplusplus
 }

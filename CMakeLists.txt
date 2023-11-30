@@ -12,7 +12,7 @@ INCLUDE (CheckCSourceCompiles)
 INCLUDE (CheckStructHasMember)
 INCLUDE (CheckLibraryExists)
 
-PROJECT (c-ares LANGUAGES C VERSION "1.22.1" )
+PROJECT (c-ares LANGUAGES C VERSION "1.23.0" )
 
 # Set this version before release
 SET (CARES_VERSION "${PROJECT_VERSION}")
@@ -30,17 +30,18 @@ INCLUDE (GNUInstallDirs) # include this *AFTER* PROJECT(), otherwise paths are w
 # For example, a version of 4:0:2 would generate output such as:
 #    libname.so   -> libname.so.2
 #    libname.so.2 -> libname.so.2.2.0
-SET (CARES_LIB_VERSIONINFO "10:1:8")
+SET (CARES_LIB_VERSIONINFO "11:0:9")
 
 
-OPTION (CARES_STATIC     "Build as a static library"                                             OFF)
-OPTION (CARES_SHARED     "Build as a shared library"                                             ON)
-OPTION (CARES_INSTALL    "Create installation targets (chain builders may want to disable this)" ON)
-OPTION (CARES_STATIC_PIC "Build the static library as PIC (position independent)"                OFF)
-OPTION (CARES_BUILD_TESTS "Build and run tests"                                                  OFF)
+OPTION (CARES_STATIC        "Build as a static library"                                             OFF)
+OPTION (CARES_SHARED        "Build as a shared library"                                             ON)
+OPTION (CARES_INSTALL       "Create installation targets (chain builders may want to disable this)" ON)
+OPTION (CARES_STATIC_PIC    "Build the static library as PIC (position independent)"                OFF)
+OPTION (CARES_BUILD_TESTS   "Build and run tests"                                                   OFF)
 OPTION (CARES_BUILD_CONTAINER_TESTS "Build and run container tests (implies CARES_BUILD_TESTS, Linux only)" OFF)
-OPTION (CARES_BUILD_TOOLS "Build tools"                                                          ON)
-OPTION (CARES_SYMBOL_HIDING "Hide private symbols in shared libraries"                           OFF)
+OPTION (CARES_BUILD_TOOLS   "Build tools"                                                           ON)
+OPTION (CARES_SYMBOL_HIDING "Hide private symbols in shared libraries"                              OFF)
+OPTION (CARES_THREADS       "Build with thread-safety support"                                      ON)
 SET    (CARES_RANDOM_FILE "/dev/urandom" CACHE STRING "Suitable File / Device Path for entropy, such as /dev/urandom")
 
 
@@ -56,7 +57,7 @@ ENDIF ()
 IF ((CARES_BUILD_TESTS OR CARES_BUILD_CONTAINER_TESTS) AND (NOT CARES_STATIC) AND WIN32)
 	SET (CARES_STATIC ON)
 	SET (CARES_STATIC_PIC ON)
-	MESSAGE (WARNING "Static building was requested be disabled, but reenabled to support tests")
+	MESSAGE (WARNING "Static building was requested be disabled, but re-enabled to support tests")
 ENDIF ()
 
 INCLUDE (EnableWarnings)
@@ -440,6 +441,43 @@ CHECK_FUNCTION_EXISTS (__system_property_get HAVE___SYSTEM_PROPERTY_GET)
 SET (CMAKE_EXTRA_INCLUDE_FILES)
 SET (CMAKE_REQUIRED_DEFINITIONS)
 SET (CMAKE_REQUIRED_LIBRARIES)
+
+
+################################################################################
+# Threading Support
+#
+IF (CARES_THREADS)
+	IF (WIN32)
+		# Do nothing, always has threads
+	ELSE ()
+		# Need to prefer pthreads on platforms that may have more threading choices
+		# (e.g. Solaris)
+		SET (CMAKE_THREAD_PREFER_PTHREAD TRUE)
+		FIND_PACKAGE (Threads)
+
+		IF (Threads_FOUND)
+			# Fix solaris9 bug due to libc having pthread_create() stubs that always fail.  CMake
+			# doesn't realize that the real pthread functions aren't in libc, so sets the pthread
+			# library CAKE_THREAD_LIBS_INIT variable to blank instead of to the correct "-lpthread".
+			IF (CMAKE_SYSTEM_NAME STREQUAL "SunOS" AND NOT CMAKE_THREAD_LIBS_INIT)
+				SET (CMAKE_THREAD_LIBS_INIT "-lpthread")
+			ENDIF ()
+
+			# PThread functions.
+			CHECK_INCLUDE_FILES (pthread.h                                 HAVE_PTHREAD_H)
+			CHECK_INCLUDE_FILES (pthread_np.h                              HAVE_PTHREAD_NP_H)
+			CARES_EXTRAINCLUDE_IFSET (HAVE_PTHREAD_H                       pthread.h)
+			CARES_EXTRAINCLUDE_IFSET (HAVE_PTHREAD_NP_H                    pthread_np.h)
+			CHECK_SYMBOL_EXISTS (pthread_init  "${CMAKE_EXTRA_INCLUDE_FILES}" HAVE_PTHREAD_INIT)
+			# Make sure libcares.pc.cmake knows about thread libraries on static builds
+			LIST (APPEND CARES_DEPENDENT_LIBS ${CMAKE_THREAD_LIBS_INIT})
+		ELSE ()
+			MESSAGE (WARNING "Threading support not found, disabling...")
+			SET (CARES_THREADS OFF)
+		ENDIF ()
+	ENDIF ()
+ENDIF ()
+
 
 
 ################################################################################
