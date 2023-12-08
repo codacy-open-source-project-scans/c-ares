@@ -131,6 +131,9 @@ AX_CXX_COMPILE_STDCXX_11([noext],[optional])
 
 XC_AUTOMAKE
 
+dnl make sure we use system extensions like _GNU_SOURCE or _XOPEN_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
+
 dnl This defines _ALL_SOURCE for AIX
 CARES_CHECK_AIX_ALL_SOURCE
 
@@ -578,6 +581,7 @@ AC_CHECK_HEADERS(
        netinet/in.h \
        netinet/tcp.h \
        net/if.h \
+       ifaddrs.h \
        errno.h \
        socket.h \
        strings.h \
@@ -749,6 +753,7 @@ CARES_CHECK_FUNC_STRNICMP
 CARES_CHECK_FUNC_WRITEV
 CARES_CHECK_FUNC_ARC4RANDOM_BUF
 CARES_CHECK_FUNC_STAT
+CARES_CHECK_FUNC_GETIFADDRS
 
 dnl check for AF_INET6
 CARES_CHECK_CONSTANT(
@@ -918,7 +923,10 @@ AC_CHECK_MEMBER(struct addrinfo.ai_flags,
 
 AC_CHECK_FUNCS([bitncmp \
   gettimeofday \
-  if_indextoname
+  if_indextoname \
+  if_nametoindex \
+  ConvertInterfaceIndexToLuid \
+  ConvertInterfaceLuidToNameA
 ],[
 ],[
   func="$ac_func"
