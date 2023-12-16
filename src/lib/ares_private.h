@@ -227,24 +227,9 @@ struct query {
                            * when a query is to be canceled */
 };
 
-/* An IP address pattern; matches an IP address X if X & mask == addr */
-#define PATTERN_MASK 0x1
-#define PATTERN_CIDR 0x2
-
 struct apattern {
-  union {
-    struct in_addr       addr4;
-    struct ares_in6_addr addr6;
-  } addr;
-
-  union {
-    struct in_addr       addr4;
-    struct ares_in6_addr addr6;
-    unsigned short       bits;
-  } mask;
-
-  int            family;
-  unsigned short type;
+  struct ares_addr addr;
+  unsigned char    mask;
 };
 
 struct ares__qcache;
@@ -606,6 +591,14 @@ typedef unsigned __int64 ares_uint64_t;
 #else
 typedef long long          ares_int64_t;
 typedef unsigned long long ares_uint64_t;
+#endif
+
+#ifdef _WIN32
+#  define HOSTENT_ADDRTYPE_TYPE short
+#  define HOSTENT_LENGTH_TYPE   short
+#else
+#  define HOSTENT_ADDRTYPE_TYPE int
+#  define HOSTENT_LENGTH_TYPE   int
 #endif
 
 #endif /* __ARES_PRIVATE_H */

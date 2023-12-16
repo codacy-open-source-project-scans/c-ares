@@ -24,8 +24,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "ares_setup.h"
-#include "ares.h"
-#include "ares_private.h"
+
 
 #ifdef USE_WINSOCK
 #  include <winsock2.h>
@@ -57,9 +56,8 @@
 #  include <netinet/in.h>
 #endif
 
-#ifndef IFNAMSIZ
-#  define IFNAMSIZ 64
-#endif
+#include "ares.h"
+#include "ares_private.h"
 
 static ares_status_t ares__iface_ips_enumerate(ares__iface_ips_t *ips,
                                                const char        *name);
@@ -203,8 +201,9 @@ static ares_status_t
     size_t alloc_size;
 
     alloc_size = ares__round_up_pow2(ips->alloc_size + 1);
-    temp       = ares_realloc_zero(ips->ips, ips->alloc_size * sizeof(ips->ips),
-                                   alloc_size * sizeof(ips->ips));
+    temp       = ares_realloc_zero(ips->ips,
+                                   ips->alloc_size * sizeof(*ips->ips),
+                                   alloc_size * sizeof(*ips->ips));
     if (temp == NULL) {
       return ARES_ENOMEM;
     }
@@ -282,7 +281,7 @@ unsigned int ares__iface_ips_get_ll_scope(const ares__iface_ips_t *ips,
 
 #ifdef USE_WINSOCK
 
-#if 0
+#  if 0
 static char *wcharp_to_charp(const wchar_t *in)
 {
   char *out;
@@ -302,7 +301,7 @@ static char *wcharp_to_charp(const wchar_t *in)
 
   return out;
 }
-#endif
+#  endif
 
 static ares_bool_t name_match(const char *name, const char *adapter_name,
                               unsigned int ll_scope)
@@ -353,11 +352,12 @@ static ares_status_t ares__iface_ips_enumerate(ares__iface_ips_t *ips,
   }
 
   for (address = addresses; address != NULL; address = address->Next) {
-    IP_ADAPTER_UNICAST_ADDRESS *ipaddr   = NULL;
-    ares__iface_ip_flags_t      addrflag = 0;
+    IP_ADAPTER_UNICAST_ADDRESS *ipaddr     = NULL;
+    ares__iface_ip_flags_t      addrflag   = 0;
     char                        ifname[64] = "";
 
-#if defined(HAVE_CONVERTINTERFACEINDEXTOLUID) && defined(HAVE_CONVERTINTERFACELUIDTONAMEA)
+#  if defined(HAVE_CONVERTINTERFACEINDEXTOLUID) && \
+    defined(HAVE_CONVERTINTERFACELUIDTONAMEA)
     /* Retrieve name from interface index.
      * address->AdapterName appears to be a GUID/UUID of some sort, not a name.
      * address->FriendlyName is user-changeable.
@@ -367,9 +367,9 @@ static ares_status_t ares__iface_ips_enumerate(ares__iface_ips_t *ips,
     NET_LUID luid;
     ConvertInterfaceIndexToLuid(address->IfIndex, &luid);
     ConvertInterfaceLuidToNameA(&luid, ifname, sizeof(ifname));
-#else
+#  else
     ares_strcpy(ifname, address->AdapterName, sizeof(ifname));
-#endif
+#  endif
 
     if (address->OperStatus != IfOperStatusUp) {
       addrflag |= ARES_IFACE_IP_OFFLINE;
@@ -384,14 +384,14 @@ static ares_status_t ares__iface_ips_enumerate(ares__iface_ips_t *ips,
       struct ares_addr addr;
 
       if (ipaddr->Address.lpSockaddr->sa_family == AF_INET) {
-        struct sockaddr_in *sockaddr_in =
-          (struct sockaddr_in *)((void *)ipaddr->Address.lpSockaddr);
+        const struct sockaddr_in *sockaddr_in =
+          (const struct sockaddr_in *)((void *)ipaddr->Address.lpSockaddr);
         addr.family = AF_INET;
         memcpy(&addr.addr.addr4, &sockaddr_in->sin_addr,
                sizeof(addr.addr.addr4));
       } else if (ipaddr->Address.lpSockaddr->sa_family == AF_INET6) {
-        struct sockaddr_in6 *sockaddr_in6 =
-          (struct sockaddr_in6 *)((void *)ipaddr->Address.lpSockaddr);
+        const struct sockaddr_in6 *sockaddr_in6 =
+          (const struct sockaddr_in6 *)((void *)ipaddr->Address.lpSockaddr);
         addr.family = AF_INET6;
         memcpy(&addr.addr.addr6, &sockaddr_in6->sin6_addr,
                sizeof(addr.addr.addr6));
@@ -466,16 +466,16 @@ static ares_status_t ares__iface_ips_enumerate(ares__iface_ips_t *ips,
     }
 
     if (ifa->ifa_addr->sa_family == AF_INET) {
-      struct sockaddr_in *sockaddr_in =
-        (struct sockaddr_in *)((void *)ifa->ifa_addr);
+      const struct sockaddr_in *sockaddr_in =
+        (const struct sockaddr_in *)((void *)ifa->ifa_addr);
       addr.family = AF_INET;
       memcpy(&addr.addr.addr4, &sockaddr_in->sin_addr, sizeof(addr.addr.addr4));
       /* netmask */
       sockaddr_in = (struct sockaddr_in *)((void *)ifa->ifa_netmask);
       netmask     = count_addr_bits((const void *)&sockaddr_in->sin_addr, 4);
     } else if (ifa->ifa_addr->sa_family == AF_INET6) {
-      struct sockaddr_in6 *sockaddr_in6 =
-        (struct sockaddr_in6 *)((void *)ifa->ifa_addr);
+      const struct sockaddr_in6 *sockaddr_in6 =
+        (const struct sockaddr_in6 *)((void *)ifa->ifa_addr);
       addr.family = AF_INET6;
       memcpy(&addr.addr.addr6, &sockaddr_in6->sin6_addr,
              sizeof(addr.addr.addr6));
@@ -554,7 +554,7 @@ const char *ares__if_indextoname(unsigned int index, char *name,
                                  size_t name_len)
 {
 #ifdef HAVE_IF_INDEXTONAME
-  if (name_len < IFNAMSIZ) {
+  if (name_len < IF_NAMESIZE) {
     return NULL;
   }
   return if_indextoname(index, name);
@@ -564,7 +564,7 @@ const char *ares__if_indextoname(unsigned int index, char *name,
   size_t             i;
   const char        *ptr = NULL;
 
-  if (name_len < IFNAMSIZ) {
+  if (name_len < IF_NAMESIZE) {
     goto done;
   }
 

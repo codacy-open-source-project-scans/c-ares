@@ -12,7 +12,7 @@ INCLUDE (CheckCSourceCompiles)
 INCLUDE (CheckStructHasMember)
 INCLUDE (CheckLibraryExists)
 
-PROJECT (c-ares LANGUAGES C VERSION "1.23.0" )
+PROJECT (c-ares LANGUAGES C VERSION "1.24.0" )
 
 # Set this version before release
 SET (CARES_VERSION "${PROJECT_VERSION}")
@@ -30,7 +30,7 @@ INCLUDE (GNUInstallDirs) # include this *AFTER* PROJECT(), otherwise paths are w
 # For example, a version of 4:0:2 would generate output such as:
 #    libname.so   -> libname.so.2
 #    libname.so.2 -> libname.so.2.2.0
-SET (CARES_LIB_VERSIONINFO "11:0:9")
+SET (CARES_LIB_VERSIONINFO "12:0:10")
 
 
 OPTION (CARES_STATIC        "Build as a static library"                                             OFF)
@@ -45,9 +45,9 @@ OPTION (CARES_THREADS       "Build with thread-safety support"                  
 SET    (CARES_RANDOM_FILE "/dev/urandom" CACHE STRING "Suitable File / Device Path for entropy, such as /dev/urandom")
 
 
-# Tests require a C++ compiler
+# Tests require a C++14 compiler
 IF (CARES_BUILD_TESTS OR CARES_BUILD_CONTAINER_TESTS)
-	set(CMAKE_CXX_STANDARD 11)
+	set(CMAKE_CXX_STANDARD 14)
 	set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 	set(CMAKE_CXX_EXTENSIONS FALSE)
 	enable_language(CXX)
@@ -496,7 +496,7 @@ ENDIF ()
 # defaults.  This should be much quicker and nearly as accurate ... and even
 # if not, it probably won't matter in the least.
 
-IF (HAVE_SSIZE_T AND HAVE_SOCKLEN_T)
+IF (HAVE_SSIZE_T AND HAVE_SOCKLEN_T AND NOT WIN32)
 	# If we have ssize_t and socklen_t, the API is usually sane and uses ssize_t and size_t for lengths
 	SET (RECVFROM_TYPE_RETV ssize_t)
 	SET (RECVFROM_TYPE_ARG3 size_t)

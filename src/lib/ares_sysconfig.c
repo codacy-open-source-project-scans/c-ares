@@ -309,7 +309,7 @@ static ares_bool_t get_DNS_Windows(char **outptr)
   ULONG                          Bufsz     = IPAA_INITIAL_BUF_SZ;
   ULONG                          AddrFlags = 0;
   int                            trying    = IPAA_MAX_TRIES;
-  int                            res;
+  ULONG                          res;
 
   /* The capacity of addresses, in elements. */
   size_t                         addressesSize;
@@ -400,9 +400,9 @@ static ares_bool_t get_DNS_Windows(char **outptr)
           addressesSize = newSize;
         }
 
-        addresses[addressesIndex].metric =
-          getBestRouteMetric(&ipaaEntry->Luid, (SOCKADDR_INET *)(namesrvr.sa),
-                             ipaaEntry->Ipv4Metric);
+        addresses[addressesIndex].metric = getBestRouteMetric(
+          &ipaaEntry->Luid, (SOCKADDR_INET *)((void *)(namesrvr.sa)),
+          ipaaEntry->Ipv4Metric);
 
         /* Record insertion index to make qsort stable */
         addresses[addressesIndex].orig_idx = addressesIndex;
@@ -416,7 +416,7 @@ static ares_bool_t get_DNS_Windows(char **outptr)
                  ntohs(namesrvr.sa4->sin_port));
         ++addressesIndex;
       } else if (namesrvr.sa->sa_family == AF_INET6) {
-        unsigned int ll_scope = 0;
+        unsigned int     ll_scope = 0;
         struct ares_addr addr;
 
         if (memcmp(&namesrvr.sa6->sin6_addr, &ares_in6addr_any,
@@ -444,9 +444,9 @@ static ares_bool_t get_DNS_Windows(char **outptr)
           ll_scope = ipaaEntry->Ipv6IfIndex;
         }
 
-        addresses[addressesIndex].metric =
-          getBestRouteMetric(&ipaaEntry->Luid, (SOCKADDR_INET *)(namesrvr.sa),
-                             ipaaEntry->Ipv6Metric);
+        addresses[addressesIndex].metric = getBestRouteMetric(
+          &ipaaEntry->Luid, (SOCKADDR_INET *)((void *)(namesrvr.sa)),
+          ipaaEntry->Ipv6Metric);
 
         /* Record insertion index to make qsort stable */
         addresses[addressesIndex].orig_idx = addressesIndex;
@@ -458,8 +458,8 @@ static ares_bool_t get_DNS_Windows(char **outptr)
 
         if (ll_scope) {
           snprintf(addresses[addressesIndex].text,
-                   sizeof(addresses[addressesIndex].text), "[%s]:%u%%%u", ipaddr,
-                   ntohs(namesrvr.sa6->sin6_port), ll_scope);
+                   sizeof(addresses[addressesIndex].text), "[%s]:%u%%%u",
+                   ipaddr, ntohs(namesrvr.sa6->sin6_port), ll_scope);
         } else {
           snprintf(addresses[addressesIndex].text,
                    sizeof(addresses[addressesIndex].text), "[%s]:%u", ipaddr,
@@ -855,9 +855,9 @@ static ares_status_t ares__init_sysconfig_libresolv(ares_sysconfig_t *sysconfig)
 
   for (i = 0; i < (size_t)nscount; ++i) {
     char           ipaddr[INET6_ADDRSTRLEN] = "";
-    char          *ipstr    = NULL;
-    unsigned short port     = 0;
-    unsigned int   ll_scope = 0;
+    char          *ipstr                    = NULL;
+    unsigned short port                     = 0;
+    unsigned int   ll_scope                 = 0;
 
     sa_family_t    family = addr[i].sin.sin_family;
     if (family == AF_INET) {
