@@ -201,9 +201,8 @@ static ares_status_t
     size_t alloc_size;
 
     alloc_size = ares__round_up_pow2(ips->alloc_size + 1);
-    temp       = ares_realloc_zero(ips->ips,
-                                   ips->alloc_size * sizeof(*ips->ips),
-                                   alloc_size * sizeof(*ips->ips));
+    temp = ares_realloc_zero(ips->ips, ips->alloc_size * sizeof(*ips->ips),
+                             alloc_size * sizeof(*ips->ips));
     if (temp == NULL) {
       return ARES_ENOMEM;
     }
@@ -509,12 +508,11 @@ done:
 
 #else
 
-static ares_status_t ares__iface_ips_enumerate(ares__iface_ips_t     *ips,
-                                               ares__iface_ip_flags_t flags,
-                                               const char            *name)
+static ares_status_t ares__iface_ips_enumerate(ares__iface_ips_t *ips,
+                                               const char        *name)
 {
   (void)ips;
-  (void)flags;
+  (void)name;
   return ARES_ENOTIMP;
 }
 

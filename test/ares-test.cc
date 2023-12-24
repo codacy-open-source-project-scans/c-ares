@@ -1,17 +1,25 @@
-/*
- * Copyright (C) Brad House
+/* MIT License
  *
- * Permission to use, copy, modify, and distribute this
- * software and its documentation for any purpose and without
- * fee is hereby granted, provided that the above copyright
- * notice appear in all copies and that both that copyright
- * notice and this permission notice appear in supporting
- * documentation, and that the name of M.I.T. not be used in
- * advertising or publicity pertaining to distribution of the
- * software without specific, written prior permission.
- * M.I.T. makes no representations about the suitability of
- * this software for any purpose.  It is provided "as is"
- * without express or implied warranty.
+ * Copyright (c) The c-ares project and its contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  *
  * SPDX-License-Identifier: MIT
  */
@@ -21,9 +29,22 @@
 #include "ares-test.h"
 #include "ares-test-ai.h"
 #include "dns-proto.h"
-
-// Include ares internal files for DNS protocol details
 #include "ares_dns.h"
+
+extern "C" {
+// Remove command-line defines of package variables for the test project...
+#undef PACKAGE_NAME
+#undef PACKAGE_BUGREPORT
+#undef PACKAGE_STRING
+#undef PACKAGE_TARNAME
+// ... so we can include the library's config without symbol redefinitions.
+#include "ares_setup.h"
+#include "ares_inet_net_pton.h"
+#include "ares_data.h"
+#include "ares_strsplit.h"
+#include "ares_private.h"
+}
+
 
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
@@ -80,11 +101,35 @@ std::map<size_t, int> LibraryTest::size_fails_;
 
 void ProcessWork(ares_channel_t *channel,
                  std::function<std::set<ares_socket_t>()> get_extrafds,
-                 std::function<void(ares_socket_t)> process_extra) {
+                 std::function<void(ares_socket_t)> process_extra,
+                 unsigned int cancel_ms) {
   int nfds, count;
   fd_set readers, writers;
-  struct timeval tv;
+
+#ifndef CARES_SYMBOL_HIDING
+  struct timeval tv_begin  = ares__tvnow();
+  struct timeval tv_cancel = tv_begin;
+
+  if (cancel_ms) {
+    if (verbose) std::cerr << "ares_cancel will be called after " << cancel_ms << "ms" << std::endl;
+    tv_cancel.tv_sec  += (cancel_ms / 1000);
+    tv_cancel.tv_usec += ((cancel_ms % 1000) * 1000);
+  }
+#else
+  if (cancel_ms) {
+    std::cerr << "library built with symbol hiding, can't test with cancel support" << std::endl;
+    return;
+  }
+#endif
+
   while (true) {
+#ifndef CARES_SYMBOL_HIDING
+    struct timeval  tv_now = ares__tvnow();
+    struct timeval  tv_remaining;
+#endif
+    struct timeval  tv;
+    struct timeval *tv_select;
+
     // Retrieve the set of file descriptors that the library wants us to monitor.
     FD_ZERO(&readers);
     FD_ZERO(&writers);
@@ -103,10 +148,29 @@ void ProcessWork(ares_channel_t *channel,
 
     /* If ares_timeout returns NULL, it means there are no requests in queue,
      * so we can break out */
-    if (ares_timeout(channel, NULL, &tv) == NULL)
+    tv_select = ares_timeout(channel, NULL, &tv);
+    if (tv_select == NULL)
       return;
 
-    count = select(nfds, &readers, &writers, nullptr, &tv);
+#ifndef CARES_SYMBOL_HIDING
+    if (cancel_ms) {
+      unsigned int remaining_ms;
+      ares__timeval_remaining(&tv_remaining,
+                              &tv_now,
+                              &tv_cancel);
+      remaining_ms = (unsigned int)((tv_remaining.tv_sec * 1000) + (tv_remaining.tv_usec / 1000));
+      if (remaining_ms == 0) {
+        if (verbose) std::cerr << "Issuing ares_cancel()" << std::endl;
+        ares_cancel(channel);
+        cancel_ms = 0; /* Disable issuing cancel again */
+      } else {
+        /* Recalculate proper timeout since we also have a cancel to wait on */
+        tv_select = ares_timeout(channel, &tv_remaining, &tv);
+      }
+    }
+#endif
+
+    count = select(nfds, &readers, &writers, nullptr, tv_select);
     if (count < 0) {
       fprintf(stderr, "select() failed, errno %d\n", errno);
       return;
@@ -183,16 +247,16 @@ std::set<ares_socket_t> NoExtraFDs() {
   return std::set<ares_socket_t>();
 }
 
-void DefaultChannelTest::Process() {
-  ProcessWork(channel_, NoExtraFDs, nullptr);
+void DefaultChannelTest::Process(unsigned int cancel_ms) {
+  ProcessWork(channel_, NoExtraFDs, nullptr, cancel_ms);
 }
 
-void FileChannelTest::Process() {
-  ProcessWork(channel_, NoExtraFDs, nullptr);
+void FileChannelTest::Process(unsigned int cancel_ms) {
+  ProcessWork(channel_, NoExtraFDs, nullptr, cancel_ms);
 }
 
-void DefaultChannelModeTest::Process() {
-  ProcessWork(channel_, NoExtraFDs, nullptr);
+void DefaultChannelModeTest::Process(unsigned int cancel_ms) {
+  ProcessWork(channel_, NoExtraFDs, nullptr, cancel_ms);
 }
 
 MockServer::MockServer(int family, unsigned short port)
@@ -312,8 +376,8 @@ void MockServer::ProcessPacket(ares_socket_t fd, struct sockaddr_storage *addr, 
               << ")" << std::endl;
     return;
   }
-  byte* question = data + 12;
-  int qlen = len - 12;
+  byte* question = data + NS_HFIXEDSZ;
+  int qlen = len - NS_HFIXEDSZ;
 
   char *name = nullptr;
   long enclen;
@@ -322,7 +386,11 @@ void MockServer::ProcessPacket(ares_socket_t fd, struct sockaddr_storage *addr, 
     std::cerr << "Failed to retrieve name" << std::endl;
     return;
   }
-  qlen -= enclen;
+  if (enclen > qlen) {
+    std::cerr << "(error, encoded name len " << enclen << "bigger than remaining data " << qlen << " bytes)" << std::endl;
+    return;
+  }
+  qlen -= (int)enclen;
   question += enclen;
   std::string namestr(name);
   ares_free_string(name);
@@ -571,11 +639,12 @@ void MockChannelOptsTest::ProcessFD(ares_socket_t fd) {
   }
 }
 
-void MockChannelOptsTest::Process() {
+void MockChannelOptsTest::Process(unsigned int cancel_ms) {
   using namespace std::placeholders;
   ProcessWork(channel_,
               std::bind(&MockChannelOptsTest::fds, this),
-              std::bind(&MockChannelOptsTest::ProcessFD, this, _1));
+              std::bind(&MockChannelOptsTest::ProcessFD, this, _1),
+              cancel_ms);
 }
 
 std::ostream& operator<<(std::ostream& os, const HostResult& result) {
