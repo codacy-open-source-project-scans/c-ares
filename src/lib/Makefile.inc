@@ -10,6 +10,7 @@ CSOURCES = ares__addrinfo2hostent.c	\
   ares__htable_asvp.c			\
   ares__htable_strvp.c			\
   ares__htable_szvp.c			\
+  ares__htable_vpvp.c			\
   ares__iface_ips.c			\
   ares__llist.c				\
   ares__parse_into_addrinfo.c		\
@@ -27,6 +28,7 @@ CSOURCES = ares__addrinfo2hostent.c	\
   ares_dns_parse.c			\
   ares_dns_record.c			\
   ares_dns_write.c			\
+  ares_event_configchg.c	\
   ares_event_epoll.c			\
   ares_event_kqueue.c			\
   ares_event_poll.c			\
@@ -88,6 +90,7 @@ HHEADERS = ares__buf.h			\
   ares__htable_asvp.h			\
   ares__htable_strvp.h			\
   ares__htable_szvp.h			\
+  ares__htable_vpvp.h			\
   ares__iface_ips.h			\
   ares__llist.h				\
   ares__slist.h				\
@@ -106,5 +109,6 @@ HHEADERS = ares__buf.h			\
   ares_str.h				\
   ares_strsplit.h			\
   ares_setup.h				\
-  setup_once.h
+  setup_once.h				\
+  thirdparty/apple/dnsinfo.h
 
