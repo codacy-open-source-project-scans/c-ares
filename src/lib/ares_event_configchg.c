@@ -167,11 +167,13 @@ ares_status_t ares_event_configchg_init(ares_event_configchg_t **configchg,
 done:
   if (status != ARES_SUCCESS) {
     ares_event_configchg_free(c);
+  } else {
+    *configchg = c;
   }
   return status;
 }
 
-#elif defined(_WIN32)
+#elif defined(USE_WINSOCK)
 
 #  include <winsock2.h>
 #  include <iphlpapi.h>
@@ -258,6 +260,7 @@ done:
 #  include <unistd.h>
 #  include <notify.h>
 #  include <dlfcn.h>
+#  include <fcntl.h>
 
 struct ares_event_configchg {
   int fd;
@@ -386,7 +389,7 @@ done:
   return status;
 }
 
-#elif defined(HAVE_STAT)
+#elif defined(HAVE_STAT) && !defined(_WIN32)
 #  ifdef HAVE_SYS_TYPES_H
 #    include <sys/types.h>
 #  endif
