@@ -31,11 +31,6 @@
 #  include <netinet/in.h>
 #endif
 
-#ifdef WATT32
-#  include <tcp.h>
-#  include <sys/ioctl.h>
-#endif
-
 #define DEFAULT_TIMEOUT 2000 /* milliseconds */
 #define DEFAULT_TRIES   3
 #ifndef INADDR_NONE
@@ -419,11 +414,6 @@ ares_status_t  ares__expand_name_validated(const unsigned char *encoded,
                                            const unsigned char *abuf,
                                            size_t alen, char **s, size_t *enclen,
                                            ares_bool_t is_hostname);
-ares_status_t  ares__expand_name_for_response(const unsigned char *encoded,
-                                              const unsigned char *abuf,
-                                              size_t alen, char **s,
-                                              size_t     *enclen,
-                                              ares_bool_t is_hostname);
 ares_status_t  ares_expand_string_ex(const unsigned char *encoded,
                                      const unsigned char *abuf, size_t alen,
                                      unsigned char **s, size_t *enclen);
@@ -637,6 +627,7 @@ ares_bool_t   ares__subnet_match(const struct ares_addr *addr,
                                  unsigned char           netmask);
 ares_bool_t   ares__addr_is_linklocal(const struct ares_addr *addr);
 
+ares_bool_t   ares__is_64bit(void);
 size_t        ares__round_up_pow2(size_t n);
 size_t        ares__log2(size_t n);
 size_t        ares__pow(size_t x, size_t y);

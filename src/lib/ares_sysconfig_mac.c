@@ -80,8 +80,14 @@ static void dnsinfo_destroy(dnsinfo_t *dnsinfo)
 
 static ares_status_t dnsinfo_init(dnsinfo_t **dnsinfo_out)
 {
-  dnsinfo_t    *dnsinfo = NULL;
-  ares_status_t status  = ARES_SUCCESS;
+  dnsinfo_t    *dnsinfo       = NULL;
+  ares_status_t status        = ARES_SUCCESS;
+  size_t        i;
+  const char   *searchlibs[]  = {
+    "/usr/lib/libSystem.dylib",
+    "/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration",
+    NULL
+  };
 
   if (dnsinfo_out == NULL) {
     status = ARES_EFORMERR;
@@ -91,22 +97,34 @@ static ares_status_t dnsinfo_init(dnsinfo_t **dnsinfo_out)
   *dnsinfo_out = NULL;
 
   dnsinfo = ares_malloc_zero(sizeof(*dnsinfo));
-
   if (dnsinfo == NULL) {
     status = ARES_ENOMEM;
     goto done;
   }
 
-  dnsinfo->handle = dlopen("/usr/lib/libSystem.dylib", RTLD_LAZY | RTLD_NOLOAD);
-  if (dnsinfo->handle == NULL) {
-    status = ARES_ESERVFAIL;
-    goto done;
+  for (i=0; searchlibs[i] != NULL; i++) {
+    dnsinfo->handle = dlopen(searchlibs[i], RTLD_LAZY /* | RTLD_NOLOAD */);
+    if (dnsinfo->handle == NULL) {
+      /* Fail, loop */
+      continue;
+    }
+
+    dnsinfo->dns_configuration_copy =
+      dlsym(dnsinfo->handle, "dns_configuration_copy");
+
+    dnsinfo->dns_configuration_free =
+      dlsym(dnsinfo->handle, "dns_configuration_free");
+
+    if (dnsinfo->dns_configuration_copy != NULL &&
+        dnsinfo->dns_configuration_free != NULL) {
+      break;
+    }
+
+    /* Fail, loop */
+    dlclose(dnsinfo->handle);
+    dnsinfo->handle = NULL;
   }
 
-  dnsinfo->dns_configuration_copy =
-    dlsym(dnsinfo->handle, "dns_configuration_copy");
-  dnsinfo->dns_configuration_free =
-    dlsym(dnsinfo->handle, "dns_configuration_free");
 
   if (dnsinfo->dns_configuration_copy == NULL ||
       dnsinfo->dns_configuration_free == NULL) {
@@ -144,12 +162,17 @@ static ares_status_t read_resolver(const dns_resolver_t *resolver,
   unsigned short port   = 0;
   ares_status_t  status = ARES_SUCCESS;
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1080 /* MacOS 10.8 */
   /* XXX: resolver->domain is for domain-specific servers.  When we implement
    *      this support, we'll want to use this.  But for now, we're going to
-   *      skip any servers which set this since we can't properly route. */
+   *      skip any servers which set this since we can't properly route.
+   *      MacOS used to use this setting for a different purpose in the
+   *      past however, so on versions of MacOS < 10.8 just ignore this
+   *      completely. */
   if (resolver->domain != NULL) {
     return ARES_SUCCESS;
   }
+#endif
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1080 /* MacOS 10.8 */
   /* Check to see if DNS server should be used, base this on if the server is
@@ -291,7 +314,6 @@ static ares_status_t read_resolvers(dns_resolver_t **resolvers, int nresolvers,
 
   for (i = 0; status == ARES_SUCCESS && i < nresolvers; i++) {
     const dns_resolver_t *resolver_ptr;
-    dns_resolver_t        resolver;
 
     /* UBSAN doesn't like that this is unaligned, lets use memcpy to get the
      * address.  Equivalent to:
@@ -299,10 +321,7 @@ static ares_status_t read_resolvers(dns_resolver_t **resolvers, int nresolvers,
      */
     memcpy(&resolver_ptr, resolvers + i, sizeof(resolver_ptr));
 
-    /* UBSAN. If the pointer is misaligned, try to use memcpy to get the data
-     * into a new structure that is hopefully aligned properly */
-    memcpy(&resolver, resolver_ptr, sizeof(resolver));
-    status = read_resolver(&resolver, sysconfig);
+    status = read_resolver(resolver_ptr, sysconfig);
   }
 
   return status;
