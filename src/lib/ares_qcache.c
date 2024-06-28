@@ -23,8 +23,6 @@
  *
  * SPDX-License-Identifier: MIT
  */
-#include "ares_setup.h"
-#include "ares.h"
 #include "ares_private.h"
 
 struct ares__qcache {
@@ -135,7 +133,7 @@ static char *ares__qcache_calc_key(const ares_dns_record_t *dnsrec)
 fail:
   ares__buf_destroy(buf);
   return NULL;
-/* LCOV_EXCL_STOP */
+  /* LCOV_EXCL_STOP */
 }
 
 static void ares__qcache_expire(ares__qcache_t       *cache,
@@ -214,20 +212,20 @@ ares_status_t ares__qcache_create(ares_rand_state *rand_state,
   cache = ares_malloc_zero(sizeof(*cache));
   if (cache == NULL) {
     status = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
-    goto done; /* LCOV_EXCL_LINE: OutOfMemory */
+    goto done;            /* LCOV_EXCL_LINE: OutOfMemory */
   }
 
   cache->cache = ares__htable_strvp_create(NULL);
   if (cache->cache == NULL) {
     status = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
-    goto done; /* LCOV_EXCL_LINE: OutOfMemory */
+    goto done;            /* LCOV_EXCL_LINE: OutOfMemory */
   }
 
   cache->expire = ares__slist_create(rand_state, ares__qcache_entry_sort_cb,
                                      ares__qcache_entry_destroy_cb);
   if (cache->expire == NULL) {
     status = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
-    goto done; /* LCOV_EXCL_LINE: OutOfMemory */
+    goto done;            /* LCOV_EXCL_LINE: OutOfMemory */
   }
 
   cache->max_ttl = max_ttl;
@@ -397,7 +395,7 @@ fail:
     ares_free(entry);
   }
   return ARES_ENOMEM;
-/* LCOV_EXCL_STOP */
+  /* LCOV_EXCL_STOP */
 }
 
 ares_status_t ares_qcache_fetch(ares_channel_t           *channel,
@@ -422,7 +420,7 @@ ares_status_t ares_qcache_fetch(ares_channel_t           *channel,
   key = ares__qcache_calc_key(dnsrec);
   if (key == NULL) {
     status = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
-    goto done; /* LCOV_EXCL_LINE: OutOfMemory */
+    goto done;            /* LCOV_EXCL_LINE: OutOfMemory */
   }
 
   entry = ares__htable_strvp_get_direct(channel->qcache->cache, key);

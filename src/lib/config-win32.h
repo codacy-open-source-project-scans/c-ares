@@ -190,11 +190,8 @@
 /* Define to the type of arg 1 for send. */
 #define SEND_TYPE_ARG1 SOCKET
 
-/* Define to the type qualifier of arg 2 for send. */
-#define SEND_QUAL_ARG2 const
-
 /* Define to the type of arg 2 for send. */
-#define SEND_TYPE_ARG2 char *
+#define SEND_TYPE_ARG2 const char *
 
 /* Define to the type of arg 3 for send. */
 #define SEND_TYPE_ARG3 int
@@ -212,7 +209,7 @@
 #  undef SEND_TYPE_ARG1
 #  define SEND_TYPE_ARG1 int
 #  undef RECVFROM_TYPE_ARG1
-#  define RECVFROM_TYPE_ARG1 int
+#  define RECVFROM_TYPE_ARG1       int
 #  define NS_INADDRSZ              4
 #  define HAVE_ARPA_NAMESER_H      1
 #  define HAVE_ARPA_INET_H         1
@@ -356,7 +353,7 @@
 #endif
 
 #if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0600) && \
-   !defined(__WATCOMC__) && !defined(WATT32)
+  !defined(__WATCOMC__) && !defined(WATT32)
 /* Define if you have if_nametoindex() */
 #  define HAVE_IF_NAMETOINDEX 1
 /* Define if you have if_indextoname() */

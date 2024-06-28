@@ -23,7 +23,9 @@ CFLAGS = -g -O2 -I./include -I./src/lib \
          -I$(WATT32_ROOT)/inc \
          -Wall \
          -Wextra \
+         -Waggregate-return \
          -Wcast-align \
+         -Wcast-qual \
          -Wconversion \
          -Wdeclaration-after-statement \
          -Wdouble-promotion \
@@ -47,12 +49,14 @@ CFLAGS = -g -O2 -I./include -I./src/lib \
          -Wstrict-prototypes \
          -Wtrampolines \
          -Wundef \
+         -Wunreachable-code \
          -Wunused \
          -Wvariadic-macros \
          -Wvla \
          -Wwrite-strings \
          -Werror=implicit-int \
          -Werror=implicit-function-declaration \
+         -Wno-long-long \
          -DWATT32 -DHAVE_CONFIG_H   \
          -D_REENTRANT \
          -DCARES_NO_DEPRECATED \

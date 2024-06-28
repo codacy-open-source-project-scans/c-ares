@@ -257,8 +257,11 @@ void ProcessWork(ares_channel_t *channel,
   fd_set readers, writers;
 
 #ifndef CARES_SYMBOL_HIDING
-  ares_timeval_t tv_begin  = ares__tvnow();
-  ares_timeval_t tv_cancel = tv_begin;
+  ares_timeval_t tv_begin;
+  ares_timeval_t tv_cancel;
+
+  ares__tvnow(&tv_begin);
+  memcpy(&tv_cancel, &tv_begin, sizeof(tv_cancel));
 
   if (cancel_ms) {
     if (verbose) std::cerr << "ares_cancel will be called after " << cancel_ms << "ms" << std::endl;
@@ -274,8 +277,10 @@ void ProcessWork(ares_channel_t *channel,
 
   while (true) {
 #ifndef CARES_SYMBOL_HIDING
-    ares_timeval_t  tv_now = ares__tvnow();
+    ares_timeval_t  tv_now;
     ares_timeval_t  atv_remaining;
+
+    ares__tvnow(&tv_now);
 #endif
     struct timeval  tv;
     struct timeval *tv_select;
@@ -521,8 +526,12 @@ static unsigned short getaddrport(struct sockaddr_storage *addr)
 {
   if (addr->ss_family == AF_INET)
     return ntohs(((struct sockaddr_in *)(void *)addr)->sin_port);
+  if (addr->ss_family == AF_INET6)
+    return ntohs(((struct sockaddr_in6 *)(void *)addr)->sin6_port);
 
-  return ntohs(((struct sockaddr_in6 *)(void *)addr)->sin6_port);
+  /* TCP should use getpeername() to get the port, getting this from recvfrom
+   * won't work */
+  return 0;
 }
 
 void MockServer::ProcessPacket(ares_socket_t fd, struct sockaddr_storage *addr, ares_socklen_t addrlen,
@@ -600,7 +609,7 @@ void MockServer::ProcessFD(ares_socket_t fd) {
   }
   if (fd == tcpfd_) {
     ares_socket_t connfd = accept(tcpfd_, NULL, NULL);
-    if (connfd < 0) {
+    if (connfd == ARES_SOCKET_BAD) {
       std::cerr << "Error accepting connection on fd " << fd << std::endl;
     } else {
       connfds_.insert(connfd);
@@ -611,6 +620,7 @@ void MockServer::ProcessFD(ares_socket_t fd) {
   // Activity on a data-bearing file descriptor.
   struct sockaddr_storage addr;
   socklen_t addrlen = sizeof(addr);
+  memset(&addr, 0, sizeof(addr));
   byte buffer[2048];
   ares_ssize_t len = (ares_ssize_t)recvfrom(fd, BYTE_CAST buffer, sizeof(buffer), 0,
                      (struct sockaddr *)&addr, &addrlen);
@@ -862,11 +872,13 @@ void MockEventThreadOptsTest::ProcessThread() {
     int nfds = 0;
     fd_set readers;
 #ifndef CARES_SYMBOL_HIDING
-    ares_timeval_t tv_now = ares__tvnow();
+    ares_timeval_t tv_now;
     ares_timeval_t atv_remaining;
+
+    ares__tvnow(&tv_now);
     if (cancel_ms_ && !has_cancel_ms) {
-      tv_begin  = ares__tvnow();
-      tv_cancel = tv_begin;
+      ares__tvnow(&tv_begin);
+      memcpy(&tv_cancel, &tv_begin, sizeof(tv_cancel));
       if (verbose) std::cerr << "ares_cancel will be called after " << cancel_ms_ << "ms" << std::endl;
       tv_cancel.sec  += (cancel_ms_ / 1000);
       tv_cancel.usec += ((cancel_ms_ % 1000) * 1000);
@@ -1034,7 +1046,10 @@ std::ostream& operator<<(std::ostream& os, const AddrInfo& ai) {
     if(next_cname->name) {
       os << next_cname->name;
     }
-    if((next_cname = next_cname->next))
+
+    next_cname = next_cname->next;
+
+    if (next_cname != NULL)
       os << ", ";
     else
       os << " ";
@@ -1063,7 +1078,8 @@ std::ostream& operator<<(std::ostream& os, const AddrInfo& ai) {
       os << ":" << port;
     }
     os << "]";
-    if((next = next->ai_next))
+    next = next->ai_next;
+    if (next != NULL)
       os << ", ";
   }
   os << '}';

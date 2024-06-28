@@ -23,8 +23,6 @@
  *
  * SPDX-License-Identifier: MIT
  */
-#include "ares_setup.h"
-#include "ares.h"
 #include "ares_private.h"
 #include "ares__buf.h"
 #include <limits.h>
@@ -839,7 +837,7 @@ ares_status_t ares__buf_split(ares__buf_t *buf, const unsigned char *delims,
     }
 
     if (flags & ARES_BUF_SPLIT_RTRIM) {
-      while (len && ares__is_whitespace(ptr[len - 1], ARES_TRUE)) {
+      while (len > 0 && ares__is_whitespace(ptr[len - 1], ARES_TRUE)) {
         len--;
       }
     }
@@ -1187,24 +1185,24 @@ ares_status_t ares__buf_load_file(const char *filename, ares__buf_t *buf)
   /* Get length portably, fstat() is POSIX, not C */
   if (fseek(fp, 0, SEEK_END) != 0) {
     status = ARES_EFILE; /* LCOV_EXCL_LINE: DefensiveCoding */
-    goto done; /* LCOV_EXCL_LINE: DefensiveCoding */
+    goto done;           /* LCOV_EXCL_LINE: DefensiveCoding */
   }
 
   ftell_len = ftell(fp);
   if (ftell_len < 0) {
     status = ARES_EFILE; /* LCOV_EXCL_LINE: DefensiveCoding */
-    goto done; /* LCOV_EXCL_LINE: DefensiveCoding */
+    goto done;           /* LCOV_EXCL_LINE: DefensiveCoding */
   }
   len = (size_t)ftell_len;
 
   if (fseek(fp, 0, SEEK_SET) != 0) {
     status = ARES_EFILE; /* LCOV_EXCL_LINE: DefensiveCoding */
-    goto done; /* LCOV_EXCL_LINE: DefensiveCoding */
+    goto done;           /* LCOV_EXCL_LINE: DefensiveCoding */
   }
 
   if (len == 0) {
     status = ARES_SUCCESS; /* LCOV_EXCL_LINE: DefensiveCoding */
-    goto done; /* LCOV_EXCL_LINE: DefensiveCoding */
+    goto done;             /* LCOV_EXCL_LINE: DefensiveCoding */
   }
 
   /* Read entire data into buffer */
@@ -1212,13 +1210,13 @@ ares_status_t ares__buf_load_file(const char *filename, ares__buf_t *buf)
   ptr     = ares__buf_append_start(buf, &ptr_len);
   if (ptr == NULL) {
     status = ARES_ENOMEM; /* LCOV_EXCL_LINE: OutOfMemory */
-    goto done; /* LCOV_EXCL_LINE: OutOfMemory */
+    goto done;            /* LCOV_EXCL_LINE: OutOfMemory */
   }
 
   ptr_len = fread(ptr, 1, len, fp);
   if (ptr_len != len) {
     status = ARES_EFILE; /* LCOV_EXCL_LINE: DefensiveCoding */
-    goto done; /* LCOV_EXCL_LINE: DefensiveCoding */
+    goto done;           /* LCOV_EXCL_LINE: DefensiveCoding */
   }
 
   ares__buf_append_finish(buf, len);

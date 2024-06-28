@@ -42,11 +42,10 @@ extern "C" {
 #undef PACKAGE_STRING
 #undef PACKAGE_TARNAME
 // ... so we can include the library's config without symbol redefinitions.
-#include "ares_setup.h"
+#include "ares_private.h"
 #include "ares_inet_net_pton.h"
 #include "ares_data.h"
 #include "ares_strsplit.h"
-#include "ares_private.h"
 #include "ares__htable.h"
 
 #ifdef HAVE_ARPA_INET_H
@@ -736,7 +735,7 @@ TEST_F(LibraryTest, DNSRecord) {
     ares__buf_append_str(printmsg, ares_dns_section_tostr((ares_dns_section_t)i));
     ares__buf_append_str(printmsg, " SECTION:\n");
     for (size_t j = 0; j < ares_dns_record_rr_cnt(dnsrec, (ares_dns_section_t)i); j++) {
-      const ares_dns_rr_t *rr = ares_dns_record_rr_get(dnsrec, (ares_dns_section_t)i, j);
+      rr = ares_dns_record_rr_get(dnsrec, (ares_dns_section_t)i, j);
       ares__buf_append_str(printmsg, ares_dns_rr_get_name(rr));
       ares__buf_append_str(printmsg, ".\t\t\t");
       ares__buf_append_str(printmsg, ares_dns_class_tostr(ares_dns_rr_get_class(rr)));

@@ -230,12 +230,6 @@ if (MSVC)
 	# Visual Studio uses a completely different nomenclature for warnings than gcc/mingw/clang, so none of the
 	# "-W[name]" warnings will work.
 
-	# W4 would be better but it produces unnecessary warnings like:
-	# *  warning C4706: assignment within conditional expression
-	#     Triggered when doing "while(1)"
-	# * warning C4115: 'timeval' : named type definition in parentheses
-	# * warning C4201: nonstandard extension used : nameless struct/union
-	#     Triggered by system includes (commctrl.h, shtypes.h, Shlobj.h)
 	set(_flags
 		# Enable warnings
 		/W4 # Baseline reasonable warnings
@@ -264,8 +258,6 @@ if (MSVC)
 		# Disable some warnings
 		/wd4201 # nonstandard extension used: nameless struct/union. Used in some windows headers, e.g. IO_STATUS_BLOCK,
 		        # disable.
-		/wd4206 # nonstandard extension used: translation unit is empty. All files in c-ares are compiled even if not
-		        # used, so we need to ignore this.
 
 		# Turn some warnings into errors
 		/we4013 # Treat "function undefined, assuming extern returning int" warning as an error. https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-3-c4013
@@ -305,7 +297,9 @@ else ()
 		-Wextra
 
 		# Enable additional warnings not covered by Wall and Wextra.
+		-Waggregate-return
 		-Wcast-align
+		-Wcast-qual
 		-Wconversion
 		-Wdeclaration-after-statement
 		-Wdouble-promotion
@@ -323,6 +317,7 @@ else ()
 		-Wno-coverage-mismatch
 		-Wold-style-definition
 		-Wpacked
+		-Wpedantic
 		-Wpointer-arith
 		-Wredundant-decls
 		-Wshadow
@@ -331,6 +326,7 @@ else ()
 		-Wstrict-prototypes
 		-Wtrampolines
 		-Wundef
+		-Wunreachable-code
 		-Wunused
 		-Wvariadic-macros
 		-Wvla
@@ -349,6 +345,8 @@ else ()
 		# Some clang versions might warn if an argument like "-I/path/to/headers" is unused,
 		# silence these.
 		-Qunused-arguments
+
+		-Wno-long-long
 	)
 
 	# C++ flags:
